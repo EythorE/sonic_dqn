@@ -1,0 +1,6 @@
+numpy<2.0
+stable-retro @ git+https://github.com/Farama-Foundation/stable-retro.git@ea5ce51ab558f78ee2cdc460d854f66e4ca3d50b
+torch
+PyYAML
+tensorboard
+tqdm
