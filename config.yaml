@@ -1,11 +1,11 @@
 log:
-  name: "scenario"
+  name: "replicate_90s"
   logdir: "./runs/test/"
   log_frequency: 10000
   save_steps: 200000
 
 n_steps: 12800000 # calculated as n_training_steps * training_interval
-training_interval: 1000 # numer of steps between sgd optimization steps
+training_interval: 4 # numer of steps between sgd optimization steps
 replay_buffer_fill_samples: 10000 # number of samples to fill buffer with before starting
 replay_memory_size: 200000 # size of the replay_buffer
 copy_steps: 40000 # steps between online_dqn -> training_dqn, 10_000 * training_interval
@@ -31,7 +31,7 @@ dqn:
 environment:
   render_mode: None # human or None
   scenario: "./scenario.json"
-  max_episode_steps: 10800 # 3 minutes, 3 * 60 * 60
+  max_episode_steps: 5400 # 90s * 60fps
   n_action_repeats: 20 # number of steps to repeat every action
   frame_diff_length: 2 #5 # motion blur current frame with frame frame_diff length before
 

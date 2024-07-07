@@ -58,7 +58,7 @@ class Logger():
 
     def close(self):
         self.tb.close()
-        duration = uptime()
+        duration = self.uptime()
         print(
             f"Total time: {uptime}\n",
             f"Episodes played: {self.n_episodes_played}",
