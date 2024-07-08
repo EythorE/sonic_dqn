@@ -2,6 +2,57 @@ from collections import deque
 import gymnasium as gym
 import numpy as np
 
+def ds_grayscale(obs):
+    downscaled = obs[::2, ::2, :]
+    r, g, b = downscaled[:,:,0], downscaled[:,:,1], downscaled[:,:,2]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    return gray[None]
+
+class StickyAction(gym.Wrapper):
+    """
+    Sticky action without frame motion blur.
+
+    :param env: Environment to wrap
+    :param action_repeat_n: Number of time to repeat the last action
+    """
+    def __init__(self, env: gym.Env, n_action_repeats: int):
+        super().__init__(env)
+        self.n_action_repeats = n_action_repeats
+
+        self.height = env.observation_space.shape[0]//2
+        self.width = env.observation_space.shape[1]//2
+
+        self.observation_space = gym.spaces.Box(
+            low=-128,
+            high=127,
+            shape=(1, self.height, self.width),
+            dtype=np.dtype('int8'),
+        )
+
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        self.frame_deque.clear()
+        gray = ds_grayscale(obs)
+        obs = (gray  - 128).astype(np.int8)
+        return obs, info
+        
+
+    def step(self, action: int):
+        rew_sum = 0
+        for _ in range(self.n_action_repeats):
+            obs, rew, done, truncated, info = self.env.step(action)
+            rew_sum += rew
+            if done or truncated:
+                break
+        
+        gray = ds_grayscale(obs)
+        obs = (gray  - 128).astype(np.int8)
+
+        reward = rew_sum / self.n_action_repeats
+        return obs, reward, done, truncated, info
+    
+
 class SlowResponse(gym.Wrapper):
     """
     Sticky action with frame motion blur.
@@ -25,17 +76,10 @@ class SlowResponse(gym.Wrapper):
             dtype=np.dtype('int8'),
         )
 
-    @staticmethod
-    def ds_grayscale(obs):
-        downscaled = obs[::2, ::2, :]
-        r, g, b = downscaled[:,:,0], downscaled[:,:,1], downscaled[:,:,2]
-        gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
-        return gray[None]
-
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
         self.frame_deque.clear()
-        gray = self.ds_grayscale(obs)
+        gray = ds_grayscale(obs)
         obs = (gray  - 128).astype(np.int8)
         return obs, info
         
@@ -48,7 +92,8 @@ class SlowResponse(gym.Wrapper):
             if done or truncated:
                 break
         
-        gray = self.ds_grayscale(obs)
+        gray = ds_grayscale(obs)
+        # blur
         self.frame_deque.append(gray.astype(np.uint8))
         if len(self.frame_deque) >= self.frame_diff_length:
             old_gray = self.frame_deque.popleft()

@@ -15,10 +15,10 @@ import gymnasium as gym
 import retro
 from gymnasium.wrappers.time_limit import TimeLimit
 
-from cnn_feature_extractor import SonicCNN
+from episodic_attention import SonicTransformer
 from environment import SlowResponse, SonicDiscretizer
-from dqn import DqnNetwork
-from replay_memory import ReplayMemory
+from q_needs_attention import DqnNetwork
+from replay_memory import EpisodicReplay
 from logger import Logger
 
 
@@ -45,7 +45,7 @@ def make_dqn(env):
     max_grad_norm = cfg['dqn']['max_grad_norm']
     discount_rate = cfg['dqn']['discount_rate']
     dqnetwork = DqnNetwork(
-            SonicCNN,
+            SonicTransformer,
             optim_params = cfg['dqn']['optimizer'],
             observation_space=env.observation_space,
             n_actions=env.action_space.n,
@@ -102,7 +102,7 @@ def main():
     eps_min = cfg['eps_min']
     eps_decay_steps = cfg['eps_decay_steps']
     batch_size = cfg['batch_size'] 
-
+    Tmax = cfg['Tmax'] 
 
     logger = Logger(logdir=logdir, log_frequency=log_frequency, name=name, cfg=cfg)
     recordings_dir = logger.logdir / "recordings"
@@ -114,6 +114,7 @@ def main():
     dqnetwork = make_dqn(env)
     
     if resume:
+        resume = Path(resume)
         dqnetwork.load(resume)
         start_step = int(resume.stem)
         _epsilon = max(eps_min, eps_max - (eps_max-eps_min) * start_step/eps_decay_steps)
@@ -123,17 +124,21 @@ def main():
         action_fn = dqnetwork.afn_random
     
     print("filling memory...", end=" ", flush=True)
-    replay_memory = ReplayMemory(replay_memory_size)
+    replay_memory = EpisodicReplay(replay_memory_size)
     replay_memory.fill_replay_memory(replay_buffer_fill_samples, env, action_fn)
     print("done")
     
     obs, info = env.reset()
     done = False
     truncated = False
+    episode_memory = [[obs], [0], [None]] # make the action encoded as noop (0) for the tranformer action embedding, likely inconsequential wrt. performance 
+
     for global_step in range(start_step, n_steps):
 
         if done or truncated: # game over, start again
+            replay_memory.append([*episode_memory, done])
             obs, info = env.reset()
+            episode_memory = [[obs], [0], [None]]
             game_frames = 0
             total_episode_reward = 0
     
@@ -142,13 +147,15 @@ def main():
         if np.random.rand() < epsilon:
             action = dqnetwork.afn_random()
         else:
-            action = dqnetwork.afn_greedy(obs)
+            action = dqnetwork.afn_greedy(episode_memory[0], episode_memory[1])
     
         # take step
-        next_obs, reward, done, truncated, info = env.step(action)
-        replay_memory.append((obs, action, reward, next_obs, 1.0 - done))
-        obs = next_obs
-    
+        obs, reward, done, truncated, info = env.step(action)
+        # step in episode memory is an observation, the action we took to get to that state, and the reward we got for getting there
+        episode_memory[0].append(obs) 
+        episode_memory[1].append(action) 
+        episode_memory[2].append(reward) 
+        
         logged = logger.episode_step(reward, done, truncated, info, global_step=global_step)
         if logged:
             logger.tb.add_scalar("info/epsilon", epsilon, global_step)
@@ -158,7 +165,7 @@ def main():
         if global_step % training_interval == 0:
             # perform network optimization steps only every training_interval steps
             # vectors: obs, action, reward, next_obs, continue
-            memories = replay_memory.sample_memories(batch_size)
+            memories = replay_memory.sample_memories(batch_size, Tmax)
             loss_info = dqnetwork.training_step(memories)
             logger.training_step(loss_info, global_step)
     
