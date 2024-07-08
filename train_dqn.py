@@ -26,7 +26,7 @@ from logger import Logger
 def make_env():
     max_episode_steps = cfg['environment']['max_episode_steps']
     n_action_repeats = cfg['environment']['n_action_repeats']
-    frame_diff_length = cfg['environment']['frame_diff_length']
+    #frame_diff_length = cfg['environment']['frame_diff_length']
     scenario = cfg['environment']['scenario']
     render_mode = cfg['environment']['render_mode']
 
@@ -35,7 +35,7 @@ def make_env():
             scenario=scenario, render_mode=render_mode, record=False
             )
     env = TimeLimit(env, max_episode_steps=max_episode_steps) # adds truncated to returns
-    env = SlowResponse(env, n_action_repeats, frame_diff_length)
+    env = StickyAction(env, n_action_repeats)
     env = SonicDiscretizer(env)
     return env
 

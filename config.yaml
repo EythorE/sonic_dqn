@@ -1,5 +1,5 @@
 log:
-  name: "episodic_memory"
+  name: "episodic_memory_revised_scenario"
   logdir: "./runs/debug/"
   log_frequency: 10000
   save_steps: 200000
@@ -35,5 +35,5 @@ environment:
   scenario: "./scenario.json"
   max_episode_steps: 5400 #90s #10800 # 3 minutes, 3 * 60 * 60
   n_action_repeats: 20 # number of steps to repeat every action
-  frame_diff_length: 2 #5 # motion blur current frame with frame frame_diff length before
+    #frame_diff_length: 2 #5 # motion blur current frame with frame frame_diff length before
 

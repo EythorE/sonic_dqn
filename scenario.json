@@ -13,10 +13,11 @@
   },
   "reward": {
     "time": {
-      "reward": -2.0
+      "reward": -1.0
     },   
     "variables": {
       "screen_x": {
+        "penalty": 1.0,
         "reward": 1.0
       }
     }
