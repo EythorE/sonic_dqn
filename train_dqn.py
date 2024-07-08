@@ -60,21 +60,23 @@ def make_dqn(env):
 def record_episode(path, env, dqn, action_fn, logger, global_step):
     env.unwrapped.record_movie(path.as_posix())
     obs, info = env.reset()
-    video = [obs]
     q_values = []
     done = truncated = False
     rewards = 0
+    episode_memory = [[obs], [0], [None]]
     while not (done or truncated):
-        action = action_fn(obs)
+        action = action_fn(episode_memory[0], episode_memory[1])
         if dqn.last_q_values is not None:
-            q_values.append(dqn.last_q_values[0])
+            q_values.append(dqn.last_q_values[0,-1])
         obs, reward, done, truncated, info = env.step(action)
-        video.append(obs)
+        episode_memory[0].append(obs) 
+        episode_memory[1].append(action) 
+        episode_memory[2].append(reward) 
         rewards += reward
     print("Recorded epsiode:", path.name, info, "\ncumulated rewards:", rewards)
     env.unwrapped.stop_record()
 
-    video = np.stack(video)[None,:,[0,0,0]] # (B,T,C,H,W)
+    video = np.stack(episode_memory[0])[None,:,[0,0,0]] # (B,T,C,H,W)
     video = video + 128  
     logger.tb.add_video("observations", video.astype('uint8'), global_step=global_step, fps=6)
     if q_values:

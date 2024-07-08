@@ -7,13 +7,13 @@ log:
     #resume: "./runs/runs/log_240630-1533/2000000.pt"
 n_steps: 12800000 # calculated as n_training_steps * training_interval
 training_interval: 2 # numer of steps between sgd optimization steps
-replay_buffer_fill_samples: 2 #101 # number of episodes to fill buffer with before starting
+replay_buffer_fill_samples: 100 #101 # number of episodes to fill buffer with before starting
 replay_memory_size: 2000 # size of the replay_buffer in number of episodes
 copy_steps: 40000 # steps between online_dqn -> training_dqn, 10_000 * training_interval
 eps_max: 0.9 # exploration start/max probability
 eps_min: 0.1 # exploration end/min probability
 eps_decay_steps: 400000 # steps until eps_min, 100_000 * training_interval
-batch_size: 2
+batch_size: 10
 Tmax: 50 # maximum number of time steps for attention
 
 dqn:
