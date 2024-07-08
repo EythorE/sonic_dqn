@@ -7,8 +7,8 @@ from pathlib import Path
 import retro
 from gymnasium.wrappers.time_limit import TimeLimit
 from environment import SlowResponse, SonicDiscretizer
-from cnn_feature_extractor import SonicCNN
-from dqn import DqnNetwork
+from episodic_attention import SonicTransformer
+from q_needs_attention import DqnNetwork
 
 scenario="./scenario.json"
 max_episode_steps = 3*60*60 # 90 # stop episode after number of seconds
@@ -31,7 +31,7 @@ def make_env(
 
 def play(env, weights, strategy, epsilon, record):
     dqnetwork = DqnNetwork(
-            SonicCNN,
+            SonicTransformer,
             observation_space=env.observation_space,
             n_actions=10,
             optim_params=None,
@@ -52,9 +52,12 @@ def play(env, weights, strategy, epsilon, record):
     done = truncated = False
     rewards = 0
     time_steps = 0
+    mobs, mactions = [obs],[0]
     while not (done or truncated):
-        action = action_fn(obs) 
+        action = action_fn(mobs, mactions) 
         obs, reward, done, truncated, info = env.step(action)
+        mobs.append(obs)
+        mactions.append(action)
         rewards += reward
         print(info)
         print(f"reward: {reward:4} cumulated_rewards: {rewards}")
