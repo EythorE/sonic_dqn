@@ -16,7 +16,7 @@ import retro
 from gymnasium.wrappers.time_limit import TimeLimit
 
 from episodic_attention import SonicTransformer
-from environment import SlowResponse, SonicDiscretizer
+from environment import StickyAction, SonicDiscretizer
 from q_needs_attention import DqnNetwork
 from replay_memory import EpisodicReplay
 from logger import Logger

@@ -1,5 +1,5 @@
 log:
-  name: "episodic_memory_revised_scenario"
+  name: "mha_revised_scenario_noblur"
   logdir: "./runs/debug/"
   log_frequency: 10000
   save_steps: 200000
