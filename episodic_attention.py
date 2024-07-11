@@ -23,6 +23,17 @@ class PositionalEncoding(nn.Module):
         return x
 
 
+class MLP(nn.Sequential):
+    def __init__(self, input_size, output_size, hidden_size=None):
+        if hidden_size is None:
+            hidden_size = input_size
+        super().__init__(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size)
+        )
+
+
 class SonicTransformer(nn.Module):
     def __init__(self, observation_space, n_actions, N_embedding=512, nhead=4, num_layers=1):
         super().__init__()
@@ -34,7 +45,35 @@ class SonicTransformer(nn.Module):
         encoder_layer = TransformerEncoderLayer(d_model=N_embedding, nhead=nhead, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_layers)
         # we should consider some layer norms
-        self.output_fc = nn.Linear(N_embedding, n_actions)
+        self.q_values = MLP(N_embedding, n_actions)
+        self.immediate_reward = MLP(N_embedding, n_actions)
+        self.next_obs_embedding_pred = MLP(N_embedding, N_embedding)
+
+    def generate_embeddings(self, x):
+        B, T, C, H, W = x.size()
+        # actions.size(): (B, T)
+        x = x.reshape(B * T, C, H, W)
+        x = self.cnn(x)
+        x = x.reshape(B, T, -1)
+        x = F.normalize(x, p=2, dim=-1)
+        return x
+
+    def forward_embeddings(self, embeddings, actions):
+        # actions: B, T
+        B, T, E = embeddings.size()
+        pos_encoded = self.positional_encoding(embeddings)
+        action_encoded = self.action_encoding(actions) # encodes the action that was taken to get to this observation
+        x = pos_encoded + action_encoded
+
+        causal_mask = nn.Transformer.generate_square_subsequent_mask(T)
+        x = self.transformer_encoder(x, mask=causal_mask, is_causal=True)
+        output = {
+                "q_values": self.q_values(x),
+                "immediate_reward": self.immediate_reward(x),
+                "next_obs_embedding_pred": self.next_obs_embedding_pred(x),
+                "obs_embedding": embeddings
+            }
+        return output
 
     def forward(self, x, actions):
         B, T, C, H, W = x.size()
@@ -42,6 +81,8 @@ class SonicTransformer(nn.Module):
         x = x.reshape(B * T, C, H, W)
         x = self.cnn(x)
         x = x.reshape(B, T, -1)
+        x = F.normalize(x, p=2, dim=-1)
+        obs_embedding = x
 
         pos_encoded = self.positional_encoding(x)
         action_encoded = self.action_encoding(actions) # encodes the action that was taken to get to this observation
@@ -49,9 +90,12 @@ class SonicTransformer(nn.Module):
 
         causal_mask = nn.Transformer.generate_square_subsequent_mask(T)
         x = self.transformer_encoder(x, mask=causal_mask, is_causal=True)
-        
-        output = self.output_fc(x)
-        
+        output = {
+                "q_values": self.q_values(x),
+                "immediate_reward": self.immediate_reward(x),
+                "next_obs_embedding_pred": self.next_obs_embedding_pred(x),
+                "obs_embedding": obs_embedding
+            }
         return output
 
 if __name__ == "__main__":

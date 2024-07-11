@@ -32,7 +32,6 @@ class StickyAction(gym.Wrapper):
 
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
-        self.frame_deque.clear()
         gray = ds_grayscale(obs)
         obs = (gray  - 128).astype(np.int8)
         return obs, info

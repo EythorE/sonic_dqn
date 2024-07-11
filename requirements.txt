@@ -4,3 +4,4 @@ torch
 PyYAML
 tensorboard
 tqdm
+moviepy

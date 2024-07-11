@@ -1,13 +1,12 @@
 log:
-  name: "episodic_memory_revised_scenario"
+  name: "embedding_loss"
   logdir: "./runs/debug/"
   log_frequency: 10000
   save_steps: 200000
 
-    #resume: "./runs/runs/log_240630-1533/2000000.pt"
 n_steps: 12800000 # calculated as n_training_steps * training_interval
 training_interval: 2 # numer of steps between sgd optimization steps
-replay_buffer_fill_samples: 100 #101 # number of episodes to fill buffer with before starting
+replay_buffer_fill_samples: 100 # number of episodes to fill buffer with before starting
 replay_memory_size: 2000 # size of the replay_buffer in number of episodes
 copy_steps: 40000 # steps between online_dqn -> training_dqn, 10_000 * training_interval
 eps_max: 0.9 # exploration start/max probability
@@ -35,5 +34,4 @@ environment:
   scenario: "./scenario.json"
   max_episode_steps: 5400 #90s #10800 # 3 minutes, 3 * 60 * 60
   n_action_repeats: 20 # number of steps to repeat every action
-    #frame_diff_length: 2 #5 # motion blur current frame with frame frame_diff length before
 

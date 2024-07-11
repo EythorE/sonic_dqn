@@ -20,6 +20,7 @@ class DqnNetwork():
         self.n_actions = n_actions
         self.discount_rate = discount_rate
         self.loss_fn = loss_fn
+        self.cosine_similarity = nn.CosineSimilarity(dim=-1)
         self.max_grad_norm = max_grad_norm
         self.device = device
         self.online_q_network = QNetwork(
@@ -63,7 +64,7 @@ class DqnNetwork():
         with torch.no_grad():
             observations = torch.from_numpy(observations).to(self.device)
             actions = torch.from_numpy(actions).to(self.device)
-            q_values = self.online_q_network(observations, actions)
+            q_values = self.online_q_network(observations, actions)["q_values"]
             self.last_q_values = q_values.cpu().numpy() # should be B,T,n_actions
         return self.last_q_values 
     
@@ -82,44 +83,63 @@ class DqnNetwork():
             return self.afn_random()
         else:
             return self.afn_greedy(observations, actions)
-            
-    def compute_loss(self, observation_batch, actions, oh_chosen_actions, q_value_targets, mask):
+    
+    def compute_loss(self, observation_batch, actions, rewards, oh_chosen_actions, q_value_targets, mask):
         # Inputs should be tensors on device
         # outputs: [bs, Tmax, 10], actions: [bs, Tmax], q_values [bs, Tmax, 1], mask [bs, Tmax]
         # actions are the actions taken from these observations
         outputs = self.online_q_network(observation_batch, actions)
-        q_values = (outputs*oh_chosen_actions).sum(axis=-1, keepdims=True)
-        loss_val = self.loss_fn(q_values*mask, q_value_targets*mask)
-        return loss_val
+        q_values = (outputs["q_values"][:,:-1]*oh_chosen_actions).sum(axis=-1, keepdims=True)
+        loss_qval = self.loss_fn(q_values*mask[:,:-1], q_value_targets*mask[:,:-1])
+        
+        rewards_pred = (outputs["immediate_reward"][:,:-1]*oh_chosen_actions).sum(axis=-1, keepdims=True)
+        loss_rewards = self.loss_fn(rewards_pred*mask[:,:-1], rewards[:,1:]*mask[:,:-1])
+
+        next_obse_pred = outputs["next_obs_embedding_pred"][:,:-1]
+        next_obse = outputs["obs_embedding"][:,1:]
+        obs_cosine_loss = 1 - self.cosine_similarity(
+                next_obse_pred, next_obse
+            )
+        obs_embedding_loss = (obs_cosine_loss*mask[:,:-1, 0]).mean()
+        return {"qval": loss_qval, "immidiate_reward": loss_rewards, "next_obs_cs": obs_embedding_loss}
 
     def training_step(self, episode_memories):
         obs, actions, rewards, continues = episode_memories
         # obs (B,T,C,W,H), actions (B,T), rewards (B,T), done (B,Ti), mask (B,T)
         obs = torch.from_numpy(obs).to(self.device).float()
         with torch.no_grad():
-            # Commpute q_values = rewards + future rewards,
+            # Compute q_values = rewards + future rewards,
             # future rewards estimated from the obs in the next step
             # for each step in episode for episodes in batch
             actions = torch.from_numpy(actions).to(self.device).long() # actions -> obs
             chosen_actions = actions[:,1:] # obs ->  chosen_actions -> next_obs
             next_obs = obs[:,1:] # we are feeding action -> next_obs into the qnet
-            next_q_values = self.target_q_network(next_obs, chosen_actions).cpu().numpy()
+            preds = self.target_q_network(next_obs, chosen_actions)
+            next_q_values = preds["q_values"].cpu().numpy()
             max_next_q_values = next_q_values.max(axis=-1, keepdims=True)
             
             future_rewards = continues[:,1:,None] * self.discount_rate * max_next_q_values
-            assert not  np.isnan(future_rewards).flatten().any()
             q_value_targets = rewards[:,1:,None] + future_rewards 
-            assert not np.isnan(q_value_targets).flatten().any()
             
             oh_chosen_actions = F.one_hot(chosen_actions, num_classes=self.n_actions).to(self.device).float()
-            mask = torch.from_numpy(continues[:,:1,None]).to(self.device)
+            mask = torch.from_numpy(continues[:,:,None]).to(self.device).float()
+            rewards = torch.from_numpy(continues[:,:,None]).to(self.device).float()
+
             
         q_value_targets = torch.from_numpy(q_value_targets).to(self.device).float()
         # don't have the action for the last obs,
         # we are recording obs gotten after taking action and getting reward
-        loss = self.compute_loss(obs[:,:-1], actions[:,:-1], oh_chosen_actions, q_value_targets, mask) 
+        losses = self.compute_loss(
+                obs, actions, rewards,
+                oh_chosen_actions, q_value_targets, mask
+            )
+        loss = losses["qval"] + losses["immidiate_reward"] + losses["next_obs_cs"]
         self.optimizer.zero_grad()
         loss.backward()
         grad_norm = clip_grad_norm_(self.online_q_network.parameters(), self.max_grad_norm)
         self.optimizer.step()
-        return {'loss': loss.cpu().detach(), 'grad_norm': grad_norm.cpu().detach()}
+        return {
+                'loss': loss.cpu().detach(),
+                'grad_norm': grad_norm.cpu().detach(),
+                **{k: l.cpu().detach() for k,l in losses.items()}
+            }
