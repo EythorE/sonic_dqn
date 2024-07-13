@@ -1,5 +1,5 @@
 # Sonic the Hedgehog 2 - Emerald Hill Zone Part 1 DQN learning
-This is a refactor of a [project](https://github.com/EythorE/sonic2_reinforcement_learning) from 2018 where DQN was implemnted in Tensorflow 1.x with Openai's [gym-retro](https://github.com/openai/retro). Here it is refactored to Pytorch 2.x using the currently maintained [stable-retro](https://github.com/Farama-Foundation/stable-retro/).
+This is a refactor of a [project](https://github.com/EythorE/sonic2_reinforcement_learning) from 2018 where DQN was implemented in Tensorflow 1.x with Openai's [gym-retro](https://github.com/openai/retro). Here it is refactored to Pytorch 2.x using the currently maintained [stable-retro](https://github.com/Farama-Foundation/stable-retro/).
 
 ## Setup
 ```bash
@@ -16,6 +16,11 @@ python3 -m retro.import ./roms
 ```bash
 python train_dqn.py
 ```
+Follow the progress with Tensorboard
+```bash
+tensorboard --logdir ./runs
+```
+
 
 ## Record and play
 ### Play (and record) an epsiode played with trained DQN

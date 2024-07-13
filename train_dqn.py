@@ -102,6 +102,7 @@ def main():
     eps_min = cfg['eps_min']
     eps_decay_steps = cfg['eps_decay_steps']
     batch_size = cfg['batch_size'] 
+    device = cfg['dqn']['device']
 
 
     logger = Logger(logdir=logdir, log_frequency=log_frequency, name=name, cfg=cfg)
@@ -112,6 +113,10 @@ def main():
     
     env = make_env()
     dqnetwork = make_dqn(env)
+    input_shape = (batch_size, *env.observation_space.shape)
+    logger.tb.add_graph(
+            dqnetwork.online_q_network,
+            input_to_model=torch.zeros(input_shape).to(device).float())
     
     if resume:
         dqnetwork.load(resume)
