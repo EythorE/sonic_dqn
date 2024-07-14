@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import retro
 from gymnasium.wrappers.time_limit import TimeLimit
-from environment import SlowResponse, SonicDiscretizer
+from environment import StickyAction, SonicDiscretizer
 from episodic_attention import SonicTransformer
 from q_needs_attention import DqnNetwork
 
@@ -24,8 +24,10 @@ def make_env(
             game=game, state=state,
             scenario=scenario, render_mode=render_mode, record=record
         )
-    env = TimeLimit(env, max_episode_steps=max_episode_steps) # adds truncated to returns
-    env = SlowResponse(env, n_action_repeats, frame_diff_length)
+
+    #env = TimeLimit(env, max_episode_steps=max_episode_steps) # adds truncated to returns
+
+    env = StickyAction(env, n_action_repeats)
     env = SonicDiscretizer(env)
     return env
 
@@ -38,13 +40,13 @@ def play(env, weights, strategy, epsilon, record):
             discount_rate=None,
             loss_fn=None,
             max_grad_norm=None,
-            device='cpu'
+            device='cuda'
             )
     dqnetwork.load(weights)
     action_fn = {
             "random": dqnetwork.afn_random,
             "greedy": dqnetwork.afn_greedy,
-            "epsilon_greedy": lambda obs: dqnetwork.afn_epsilon_greedy(obs, epsilon)
+            "epsilon_greedy": lambda obs, actions: dqnetwork.afn_epsilon_greedy(obs, actions, epsilon=epsilon)
             }[strategy]
     if record:
         env.unwrapped.record_movie(record.as_posix())

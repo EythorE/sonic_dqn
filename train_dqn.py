@@ -22,19 +22,17 @@ from replay_memory import EpisodicReplay
 from logger import Logger
 
 
-
 def make_env():
     max_episode_steps = cfg['environment']['max_episode_steps']
     n_action_repeats = cfg['environment']['n_action_repeats']
-    #frame_diff_length = cfg['environment']['frame_diff_length']
     scenario = cfg['environment']['scenario']
     render_mode = cfg['environment']['render_mode']
-
     env = retro.make(
             game="SonicTheHedgehog2-Genesis", state=retro.State.DEFAULT,
             scenario=scenario, render_mode=render_mode, record=False
             )
-    env = TimeLimit(env, max_episode_steps=max_episode_steps) # adds truncated to returns
+    if max_episode_steps:
+        env = TimeLimit(env, max_episode_steps=max_episode_steps) # adds truncated to returns
     env = StickyAction(env, n_action_repeats)
     env = SonicDiscretizer(env)
     return env
@@ -85,7 +83,6 @@ def record_episode(path, env, dqn, action_fn, logger, global_step):
         for move, values in zip(moves, q_values.T):
             logger.tb.add_histogram(f'q-values/{move}', q_values, global_step=global_step)
     return
-
 
 
 def main():
