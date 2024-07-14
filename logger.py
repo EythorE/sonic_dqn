@@ -86,20 +86,20 @@ class Logger():
             # end of episode
             self.episodes_played +=1
             self.n_episode += 1
-            self.episode["completed"] += (done and info["lives"] == 3) 
+            
+            # If not stopping after the first act
+            act_1_finished = (info["act"] != 0) or (info["zone"] != 0)
+
+            self.episode["completed"] += (done and info["lives"] == 3) or act_1_finished
             self.episode["terminated"] += done
             self.episode["truncated"] += truncated
             self.episode["cumulative_reward"] += self.episode_rewards
             self.episode["num_steps"] += self.current_episode_steps 
-            self.episode['screen_x_frac'] += info['screen_x']/info['screen_x_end']
+            self.episode['screen_x_frac'] += (1 if act_1_finished else info['screen_x']/info['screen_x_end'])
             self.episode['score'] += info['score']
             self.episode['rings'] += info["rings"]
             self.episode['level_end_bonus'] += info["level_end_bonus"]
-            if not (info['screen_x']>=info['screen_x_end']) == (done and info["lives"] >= 3):
-                # If the level is completed, sonic should have at least 3 lives,
-                # possibly more do to bonuses
-                print("warning: screen_x and done(with >=3 lifes) dont agree!")
-                print(info, f"done={done}, truncated={truncated}, global_step={global_step}")
+
             # reset episode cumulators
             self.current_episode_steps = 0
             self.episode_rewards = 0

@@ -100,7 +100,7 @@ class EpisodicReplay(ReplayMemory):
             done = truncated = False
             episode_memory = [[obs], [0], [None]]
             while not (done or truncated):
-                action = action_fn(obs)
+                action = action_fn(episode_memory[0], episode_memory[1])
                 obs, reward, done, truncated, info = env.step(action)
                 episode_memory[0].append(obs) 
                 episode_memory[1].append(action) 
